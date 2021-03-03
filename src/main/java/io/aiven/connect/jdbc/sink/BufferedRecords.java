@@ -168,6 +168,7 @@ public class BufferedRecords {
                             totalUpdateCount,
                             records.size()
                     ));
+                case MULTI:
                 case UPSERT:
                 case UPDATE:
                     log.debug(
@@ -230,6 +231,12 @@ public class BufferedRecords {
                 return dbDialect.buildInsertStatement(
                         tableId,
                         tableDefinition,
+                        asColumns(fieldsMetadata.keyFieldNames),
+                        asColumns(fieldsMetadata.nonKeyFieldNames)
+                );
+            case MULTI:
+                return dbDialect.buildMultiInsertStatement(
+                        tableId,
                         asColumns(fieldsMetadata.keyFieldNames),
                         asColumns(fieldsMetadata.nonKeyFieldNames)
                 );
