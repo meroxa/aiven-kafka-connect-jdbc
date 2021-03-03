@@ -240,12 +240,6 @@ public class BufferedRecords {
                         asColumns(fieldsMetadata.keyFieldNames),
                         asColumns(fieldsMetadata.nonKeyFieldNames)
                 );
-            case MULTI:
-                return dbDialect.buildMultiInsertStatement(
-                        tableId,
-                        asColumns(fieldsMetadata.keyFieldNames),
-                        asColumns(fieldsMetadata.nonKeyFieldNames)
-                );
             case UPSERT:
                 if (fieldsMetadata.keyFieldNames.isEmpty()) {
                     throw new ConnectException(String.format(
