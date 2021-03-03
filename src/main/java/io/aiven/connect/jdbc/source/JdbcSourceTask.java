@@ -289,7 +289,7 @@ public class JdbcSourceTask extends SourceTask {
 
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
-        log.trace("{} Polling for new data");
+        log.trace("Polling for new data");
 
         while (running.get()) {
             final TableQuerier querier = tableQueue.peek();
@@ -299,9 +299,11 @@ public class JdbcSourceTask extends SourceTask {
                 final long nextUpdate = querier.getLastUpdate()
                     + config.getInt(JdbcSourceTaskConfig.POLL_INTERVAL_MS_CONFIG);
                 final long untilNext = nextUpdate - time.milliseconds();
-                if (untilNext > 0) {
-                    log.trace("Waiting {} ms to poll {} next", untilNext, querier.toString());
-                    time.sleep(untilNext);
+                final long sleepMs = Math.min(untilNext, 100);
+                if (sleepMs > 0) {
+                    log.trace("Waiting {} ms to poll {} next ({} ms total left to wait)",
+                        sleepMs, querier.toString(), untilNext);
+                    time.sleep(sleepMs);
                     continue; // Re-check stop flag before continuing
                 }
             }

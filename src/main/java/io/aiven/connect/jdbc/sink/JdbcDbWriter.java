@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Aiven Oy
+ * Copyright 2020 Aiven Oy
  * Copyright 2016 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +22,8 @@ import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -34,11 +36,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JdbcDbWriter {
+
     private static final Logger log = LoggerFactory.getLogger(JdbcDbWriter.class);
 
+    private static final Pattern NORMALIZE_TABLE_NAME_FOR_TOPIC = Pattern.compile("[^a-zA-Z0-9_]");
+
     private final JdbcSinkConfig config;
+
     private final DatabaseDialect dbDialect;
+
     private final DbStructure dbStructure;
+
     final CachedConnectionProvider cachedConnectionProvider;
 
     JdbcDbWriter(final JdbcSinkConfig config, final DatabaseDialect dbDialect, final DbStructure dbStructure) {
@@ -83,14 +91,34 @@ public class JdbcDbWriter {
     }
 
     TableId destinationTable(final String topic) {
-        final String tableName = config.tableNameFormat.replace("${topic}", topic);
-        if (tableName.isEmpty()) {
-            throw new ConnectException(String.format(
-                "Destination table name for topic '%s' is empty using the format string '%s'",
-                topic,
-                config.tableNameFormat
-            ));
-        }
+        final String tableName = generateTableNameFor(topic);
         return dbDialect.parseTableIdentifier(tableName);
     }
+
+    public String generateTableNameFor(final String topic) {
+        String tableName = config.tableNameFormat.replace("${topic}", topic);
+        if (config.tableNameNormalize) {
+            tableName = NORMALIZE_TABLE_NAME_FOR_TOPIC.matcher(tableName).replaceAll("_");
+        }
+        if (!config.topicsToTablesMapping.isEmpty()) {
+            tableName = config.topicsToTablesMapping.getOrDefault(topic, "");
+        }
+        if (tableName.isEmpty()) {
+            final String errorMessage =
+                    String.format(
+                            "Destination table for the topic: '%s' "
+                                    + "couldn't be found in the topics to tables mapping: '%s' "
+                                    + "and couldn't be generated for the format string '%s'",
+                            topic,
+                            config.topicsToTablesMapping
+                                    .entrySet()
+                                    .stream()
+                                    .map(e -> String.join("->", e.getKey(), e.getValue()))
+                                    .collect(Collectors.joining(",")),
+                            config.tableNameFormat);
+            throw new ConnectException(errorMessage);
+        }
+        return tableName;
+    }
+
 }

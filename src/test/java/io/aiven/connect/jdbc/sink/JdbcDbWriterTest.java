@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Aiven Oy
+ * Copyright 2020 Aiven Oy
  * Copyright 2016 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +34,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import io.aiven.connect.jdbc.dialect.DatabaseDialect;
@@ -75,6 +76,68 @@ public class JdbcDbWriterTest {
         dialect = new SqliteDatabaseDialect(config);
         final DbStructure dbStructure = new DbStructure(dialect);
         return new JdbcDbWriter(config, dialect, dbStructure);
+    }
+
+    @Test
+    public void shouldGenerateNormalizedTableNameForTopic() {
+        final Map<String, Object> props = new HashMap<>();
+        props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, "jdbc://localhost");
+        props.put(JdbcSinkConfig.TABLE_NAME_FORMAT, "kafka_topic_${topic}");
+        props.put(JdbcSinkConfig.TABLE_NAME_NORMALIZE, true);
+        final JdbcSinkConfig jdbcSinkConfig = new JdbcSinkConfig(props);
+
+        dialect = new SqliteDatabaseDialect(jdbcSinkConfig);
+        final DbStructure dbStructure = new DbStructure(dialect);
+        final JdbcDbWriter jdbcDbWriter = new JdbcDbWriter(jdbcSinkConfig, dialect, dbStructure);
+
+        assertEquals("kafka_topic___some_topic",
+                jdbcDbWriter.generateTableNameFor("--some_topic"));
+
+        assertEquals("kafka_topic_some_topic",
+                jdbcDbWriter.generateTableNameFor("some_topic"));
+
+        assertEquals("kafka_topic_some_topic",
+                jdbcDbWriter.generateTableNameFor("some-topic"));
+
+        assertEquals("kafka_topic_this_is_topic_with_dots",
+                jdbcDbWriter.generateTableNameFor("this.is.topic.with.dots"));
+
+        assertEquals("kafka_topic_this_is_topic_with_dots_and_weired_characters___",
+                jdbcDbWriter.generateTableNameFor("this.is.topic.with.dots.and.weired.characters#$%"));
+
+        assertEquals("kafka_topic_orders_topic__3",
+                jdbcDbWriter.generateTableNameFor("orders_topic_#3"));
+
+    }
+
+    @Test
+    public void shouldSelectTableFromMapping() {
+        final Map<String, String> props = new HashMap<>();
+        props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, "jdbc://localhnost");
+        props.put(JdbcSinkConfig.TABLE_NAME_FORMAT, "${topic}");
+        props.put(JdbcSinkConfig.TOPICS_TO_TABLES_MAPPING, "some_topic:same_table");
+
+        final JdbcSinkConfig jdbcSinkConfig = new JdbcSinkConfig(props);
+        dialect = new SqliteDatabaseDialect(jdbcSinkConfig);
+        final DbStructure dbStructure = new DbStructure(dialect);
+        final JdbcDbWriter writer = new JdbcDbWriter(jdbcSinkConfig, dialect, dbStructure);
+
+        final TableId tableId = writer.destinationTable("some_topic");
+        assertEquals("same_table", tableId.tableName());
+    }
+
+    @Test(expected = ConnectException.class)
+    public void shouldThrowConnectExceptionForUnknownTopicToTableMapping() {
+        final Map<String, String> props = new HashMap<>();
+        props.put(JdbcSinkConfig.CONNECTION_URL_CONFIG, "jdbc://localhnost");
+        props.put(JdbcSinkConfig.TABLE_NAME_FORMAT, "");
+        props.put(JdbcSinkConfig.TOPICS_TO_TABLES_MAPPING, "some_topic:same_table,some_topic2:same_table2");
+
+        final JdbcSinkConfig jdbcSinkConfig = new JdbcSinkConfig(props);
+        dialect = new SqliteDatabaseDialect(jdbcSinkConfig);
+        final DbStructure dbStructure = new DbStructure(dialect);
+        final JdbcDbWriter writer = new JdbcDbWriter(jdbcSinkConfig, dialect, dbStructure);
+        writer.generateTableNameFor("another_topic");
     }
 
     @Test
