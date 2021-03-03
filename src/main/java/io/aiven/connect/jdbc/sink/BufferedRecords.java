@@ -78,6 +78,8 @@ public class BufferedRecords {
                 record.valueSchema()
         );
 
+        log.debug("buffered records in list {}", records.size());
+
         if (currentSchemaPair == null) {
             currentSchemaPair = schemaPair;
             // re-initialize everything that depends on the record schema
@@ -98,8 +100,10 @@ public class BufferedRecords {
             final TableDefinition tableDefinition = dbStructure.tableDefinitionFor(tableId, connection);
             final String sql;
             if (config.insertMode == MULTI && records.isEmpty())  {
+                log.debug("First multi-insert, records {}", records.size());
                 sql = getFirstMultirowInsertSql(tableDefinition);
             } else {
+                log.debug("Subsequent multi-insert, records in buffer {}", records.size());
                 sql = getInsertSql(tableDefinition);
             }
 

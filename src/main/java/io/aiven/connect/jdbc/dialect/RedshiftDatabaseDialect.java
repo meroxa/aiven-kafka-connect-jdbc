@@ -243,18 +243,19 @@ public class RedshiftDatabaseDialect extends GenericDatabaseDialect {
             final Collection<ColumnId> keyColumns,
             final Collection<ColumnId> nonKeyColumns
     ) {
-        final ExpressionBuilder builder = expressionBuilder();
-        builder.append("INSERT INTO ");
-        builder.append(table);
-        builder.append("(");
-        builder.appendList()
+        log.debug("redshift: building insert statement for table {}", table.tableName());
+        return expressionBuilder()
+                .append("INSERT INTO ")
+                .append(table)
+                .append("(")
+                .appendList()
                 .delimitedBy(",")
                 .transformedBy(ExpressionBuilder.columnNames())
-                .of(keyColumns, nonKeyColumns);
-        builder.append(") VALUES(");
-        builder.appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size());
-        builder.append(")");
-        return builder.toString();
+                .of(keyColumns, nonKeyColumns)
+                .append(") VALUES(")
+                .appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size())
+                .append(")")
+                .toString();
     }
 
     @Override
@@ -263,18 +264,19 @@ public class RedshiftDatabaseDialect extends GenericDatabaseDialect {
             final Collection<ColumnId> keyColumns,
             final Collection<ColumnId> nonKeyColumns
     ) {
-        final ExpressionBuilder builder = expressionBuilder();
-        builder.append("INSERT INTO ");
-        builder.append(table);
-        builder.append("(");
-        builder.appendList()
+        log.debug("redshift: building first multi insert statement for table {}", table.tableName());
+        return expressionBuilder()
+                .append("INSERT INTO ")
+                .append(table)
+                .append("(")
+                .appendList()
                 .delimitedBy(",")
                 .transformedBy(ExpressionBuilder.columnNames())
-                .of(keyColumns, nonKeyColumns);
-        builder.append(") VALUES(");
-        builder.appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size());
-        builder.append(")");
-        return builder.toString();
+                .of(keyColumns, nonKeyColumns)
+                .append(") VALUES(")
+                .appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size())
+                .append(")")
+                .toString();
     }
 
     @Override
@@ -283,10 +285,11 @@ public class RedshiftDatabaseDialect extends GenericDatabaseDialect {
             final Collection<ColumnId> keyColumns,
             final Collection<ColumnId> nonKeyColumns
     ) {
-        final ExpressionBuilder builder = expressionBuilder();
-        builder.append(",(");
-        builder.appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size());
-        builder.append(")");
-        return builder.toString();
+        log.debug("redshift: building multi insert statement for table {}", table.tableName());
+        return expressionBuilder()
+            .append(",(")
+            .appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size())
+            .append(")")
+            .toString();
     }
 }
