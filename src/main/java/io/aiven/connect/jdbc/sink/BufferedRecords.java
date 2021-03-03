@@ -41,6 +41,8 @@ import io.aiven.connect.jdbc.util.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static io.aiven.connect.jdbc.sink.JdbcSinkConfig.InsertMode.MULTI;
+
 public class BufferedRecords {
     private static final Logger log = LoggerFactory.getLogger(BufferedRecords.class);
 
@@ -94,7 +96,13 @@ public class BufferedRecords {
             );
 
             final TableDefinition tableDefinition = dbStructure.tableDefinitionFor(tableId, connection);
-            final String sql = getInsertSql(tableDefinition);
+            final String sql;
+            if (config.insertMode == MULTI && records.isEmpty())  {
+                sql = getFirstMultirowInsertSql(tableDefinition);
+            } else {
+                sql = getInsertSql(tableDefinition);
+            }
+
             log.debug(
                     "{} sql: {}",
                     config.insertMode,
@@ -194,12 +202,40 @@ public class BufferedRecords {
         }
     }
 
+    private String getFirstMultirowInsertSql(final TableDefinition tableDefinition) {
+        if (config.insertMode != MULTI) {
+            throw new ConnectException(String.format(
+                    "Multi-row first insert SQL unsupported by insert mode %s",
+                    config.insertMode
+            ));
+        }
+        try {
+            return dbDialect.buildFirstMultiInsertStatement(
+                    tableId,
+                    asColumns(fieldsMetadata.keyFieldNames),
+                    asColumns(fieldsMetadata.nonKeyFieldNames)
+            );
+        } catch (final UnsupportedOperationException e) {
+            throw new ConnectException(String.format(
+                    "Write to table '%s' in MULTI mode is not supported with the %s dialect.",
+                    tableId,
+                    dbDialect.name()
+            ));
+        }
+    }
+
     private String getInsertSql(final TableDefinition tableDefinition) {
         switch (config.insertMode) {
             case INSERT:
                 return dbDialect.buildInsertStatement(
                         tableId,
                         tableDefinition,
+                        asColumns(fieldsMetadata.keyFieldNames),
+                        asColumns(fieldsMetadata.nonKeyFieldNames)
+                );
+            case MULTI:
+                return dbDialect.buildMultiInsertStatement(
+                        tableId,
                         asColumns(fieldsMetadata.keyFieldNames),
                         asColumns(fieldsMetadata.nonKeyFieldNames)
                 );

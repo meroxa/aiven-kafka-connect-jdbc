@@ -1350,6 +1350,24 @@ public class GenericDatabaseDialect implements DatabaseDialect {
         return builder.toString();
     }
 
+	@Override
+    public String buildFirstMultiInsertStatement(
+            final TableId table,
+            final Collection<ColumnId> keyColumns,
+            final Collection<ColumnId> nonKeyColumns
+    ) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String buildMultiInsertStatement(
+            final TableId table,
+            final Collection<ColumnId> keyColumns,
+            final Collection<ColumnId> nonKeyColumns
+    ) {
+        throw new UnsupportedOperationException();
+    }
+
     @Override
     public String buildUpdateStatement(
         final TableId table,

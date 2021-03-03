@@ -324,6 +324,18 @@ public interface DatabaseDialect extends ConnectionProvider {
         Collection<ColumnId> nonKeyColumns
     );
 
+    String buildFirstMultiInsertStatement(
+        TableId table,
+        Collection<ColumnId> keyColumns,
+        Collection<ColumnId> nonKeyColumns
+    );
+
+    String buildMultiInsertStatement(
+        TableId table,
+        Collection<ColumnId> keyColumns,
+        Collection<ColumnId> nonKeyColumns
+    );
+
     /**
      * Build the INSERT prepared statement expression for the given table and its columns.
      *
