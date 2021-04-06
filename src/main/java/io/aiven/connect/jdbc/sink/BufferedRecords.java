@@ -80,70 +80,20 @@ public class BufferedRecords {
 
         log.debug("buffered records in list {}", records.size());
 
-        if (currentSchemaPair == null) {
-            currentSchemaPair = schemaPair;
-            // re-initialize everything that depends on the record schema
-            fieldsMetadata = FieldsMetadata.extract(
-                    tableId.tableName(),
-                    config.pkMode,
-                    config.pkFields,
-                    config.fieldsWhitelist,
-                    currentSchemaPair
-            );
-            dbStructure.createOrAmendIfNecessary(
-                    config,
-                    connection,
-                    tableId,
-                    fieldsMetadata
-            );
-
-            final TableDefinition tableDefinition = dbStructure.tableDefinitionFor(tableId, connection);
-            final String sql;
-            if (config.insertMode == MULTI && records.isEmpty())  {
-                log.debug("First multi-insert, records {}", records.size());
-                sql = getFirstMultirowInsertSql(tableDefinition);
-            } else {
-                log.debug("Subsequent multi-insert, records in buffer {}", records.size());
-                sql = getInsertSql(tableDefinition);
-            }
-
-            log.debug(
-                    "{} sql: {}",
-                    config.insertMode,
-                    sql
-            );
-            close();
-            preparedStatement = connection.prepareStatement(sql);
-            preparedStatementBinder = dbDialect.statementBinder(
-                    preparedStatement,
-                    config.pkMode,
-                    schemaPair,
-                    fieldsMetadata,
-                    config.insertMode
-            );
-        }
-
         final List<SinkRecord> flushed;
-        if (currentSchemaPair.equals(schemaPair)) {
-            // Continue with current batch state
-            records.add(record);
-            if (records.size() >= config.batchSize) {
-                log.debug("Flushing buffered records after exceeding configured batch size {}.",
-                        config.batchSize);
-                flushed = flush();
-            } else {
-                flushed = Collections.emptyList();
-            }
-        } else {
-            // Each batch needs to have the same SchemaPair, so get the buffered records out, reset
-            // state and re-attempt the add
-            log.debug("Flushing buffered records after due to unequal schema pairs: "
-                    + "current schemas: {}, next schemas: {}", currentSchemaPair, schemaPair);
+        if (currentSchemaPair == null) {
+            // New Schema
+            currentSchemaPair = schemaPair;
+        } else if (!currentSchemaPair.equals(schemaPair) || (records.size() >= config.batchSize)) {
+            // schema changed or batch size reached, so flush
             flushed = flush();
             currentSchemaPair = null;
-            flushed.addAll(add(record));
+            return flushed;
         }
-        return flushed;
+
+        records.add(record);
+
+        return Collections.emptyList();
     }
 
     public List<SinkRecord> flush() throws SQLException {
@@ -152,6 +102,50 @@ public class BufferedRecords {
             return new ArrayList<>();
         }
         log.debug("Flushing {} buffered records", records.size());
+
+        // setup the prepared statement
+        fieldsMetadata = FieldsMetadata.extract(
+                tableId.tableName(),
+                config.pkMode,
+                config.pkFields,
+                config.fieldsWhitelist,
+                currentSchemaPair
+        );
+        dbStructure.createOrAmendIfNecessary(
+                config,
+                connection,
+                tableId,
+                fieldsMetadata
+        );
+
+        final TableDefinition tableDefinition = dbStructure.tableDefinitionFor(tableId, connection);
+        final String sql;
+        if (config.insertMode == MULTI)  {
+            log.debug("First multi-insert, records {}", records.size());
+            sql = multirowInsertSql(records.size(), tableDefinition);
+        } else {
+            log.debug("Single row insert, records in buffer {}", records.size());
+            sql = getInsertSql(tableDefinition);
+        }
+
+        log.debug(
+                "{} sql: {}",
+                config.insertMode,
+                sql
+        );
+        close();
+        preparedStatement = connection.prepareStatement(sql);
+        log.debug("prepared statement {}", preparedStatement);
+        preparedStatementBinder = dbDialect.statementBinder(
+                preparedStatement,
+                config.pkMode,
+                currentSchemaPair,
+                fieldsMetadata,
+                config.insertMode
+        );
+
+
+        log.debug("number of records in buffer {}", records.size());
         for (final SinkRecord record : records) {
             preparedStatementBinder.bindRecord(record);
         }
@@ -205,6 +199,32 @@ public class BufferedRecords {
             preparedStatement.close();
             preparedStatement = null;
         }
+    }
+
+    private String multirowInsertSql(int rowCount, final TableDefinition tableDefinition) {
+        String statement;
+        if (config.insertMode != MULTI) {
+            throw new ConnectException(String.format(
+                    "Multi-row first insert SQL unsupported by insert mode %s",
+                    config.insertMode
+            ));
+        }
+        try {
+            statement = getFirstMultirowInsertSql(tableDefinition);
+
+            for (int i = 0; i < (rowCount); i++) {
+                statement = statement.concat(getInsertSql(tableDefinition));
+            }
+            log.debug("statement: {}", statement);
+            return statement;
+        } catch (final UnsupportedOperationException e) {
+            throw new ConnectException(String.format(
+                    "Write to table '%s' in MULTI mode is not supported with the %s dialect.",
+                    tableId,
+                    dbDialect.name()
+            ));
+        }
+
     }
 
     private String getFirstMultirowInsertSql(final TableDefinition tableDefinition) {
@@ -267,6 +287,7 @@ public class BufferedRecords {
                     ));
                 }
             case UPDATE:
+                log.debug("dbDialect {}", dbDialect.name());
                 return dbDialect.buildUpdateStatement(
                         tableId,
                         tableDefinition,

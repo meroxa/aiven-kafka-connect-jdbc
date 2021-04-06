@@ -42,8 +42,9 @@ import io.aiven.connect.jdbc.util.ColumnDefinition;
 import io.aiven.connect.jdbc.util.ColumnId;
 import io.aiven.connect.jdbc.util.ExpressionBuilder;
 import io.aiven.connect.jdbc.util.IdentifierRules;
-import io.aiven.connect.jdbc.util.TableId;
 import io.aiven.connect.jdbc.util.TableDefinition;
+import io.aiven.connect.jdbc.util.TableId;
+
 
 
 /**
