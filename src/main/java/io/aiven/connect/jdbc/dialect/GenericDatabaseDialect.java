@@ -719,6 +719,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     ) throws SQLException {
         final String queryStr = "SELECT * FROM {} LIMIT 1";
         final String quotedName = expressionBuilder().append(tableId).toString();
+        log.debug("query: {}, name: {}", queryStr, quotedName);
         try (final PreparedStatement stmt = db.prepareStatement(queryStr)) {
             stmt.setString(1, quotedName);
             try (final ResultSet rs = stmt.executeQuery()) {

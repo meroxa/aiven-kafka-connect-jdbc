@@ -42,9 +42,8 @@ import io.aiven.connect.jdbc.util.ColumnDefinition;
 import io.aiven.connect.jdbc.util.ColumnId;
 import io.aiven.connect.jdbc.util.ExpressionBuilder;
 import io.aiven.connect.jdbc.util.IdentifierRules;
-import io.aiven.connect.jdbc.util.TableId;
 import io.aiven.connect.jdbc.util.TableDefinition;
-
+import io.aiven.connect.jdbc.util.TableId;
 
 /**
  * A {@link DatabaseDialect} for Redshift.
@@ -214,9 +213,9 @@ public class RedshiftDatabaseDialect extends GenericDatabaseDialect {
             case BOOLEAN:
                 return "BOOLEAN";
             case STRING:
-                // Redshift maps TEXT to VARCHAR(256) which is generally unsuitable. I've arbitrarily chosen 5000 as a
-                // more suitable approximation.
-                return "VARCHAR(5000)";
+                // Redshift maps TEXT to VARCHAR(256) which is generally unsuitable.
+                // Set this to max supported by redshift.
+                return "VARCHAR(65535)";
             case BYTES:
                 return "BYTEA";
             default:
