@@ -2,7 +2,7 @@
 name: Master checks after push
 on:
   push:
-    branches: [ master ]
+    branches: [ meroxa_latest ]
 jobs:
   build:
     name: Build

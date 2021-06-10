@@ -3,7 +3,7 @@
 name: Pull request checks
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ meroxa_latest ]
 jobs:
   build:
     name: Build
